@@ -48,7 +48,7 @@ img_desenfoque = cv2.GaussianBlur(img_gris, (5, 5), 0)
 bordes = cv2.Canny(img_desenfoque, 80, 160)
 imshow(bordes, title="Bordes Detectados")
 
-"""VER COMPONENTES CONECTADAS PARA LAS LETRAS"""
+"""VER COMPONENTES CONECTADAS PARA LAS LETRAS???"""
 
 # Aplicar operaciones morfológicas para resaltar formas rectangulares
 kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))

@@ -6,7 +6,7 @@ from matplotlib.patches import Rectangle
 from PIL import Image, ImageDraw, ImageFont
 from sklearn.cluster import KMeans
 
-# Defininimos función para mostrar imágenes
+"""MOSTRAR IMAGENES"""
 def imshow(img, new_fig=True, title=None, color_img=False, blocking=False, colorbar=True, ticks=False):
     if new_fig:
         plt.figure()
@@ -22,8 +22,12 @@ def imshow(img, new_fig=True, title=None, color_img=False, blocking=False, color
     if new_fig:        
         plt.show(block=blocking)
 
-"""PARA PROCESAR LA IMAGEN SIN REPETIR SIEMPRE LO MISMO (se le tiene que pasar parametros de 
-canny y kernel para cada dado, por eso no me convence, porque no estaria tan automatizado)"""
+
+#-----------------------------------------------------------------------
+#-----------------------------------------------------------------------
+
+
+"""PROCESAR LA IMAGEN""" #hay que pasarle los parametros de canny y kernel
 def procesar_imagen(imagen, t1, t2, pk): #t1 y t2 son los parametros de canny. pk es del kernel
     img_gris = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
 
@@ -45,110 +49,86 @@ def procesar_imagen(imagen, t1, t2, pk): #t1 y t2 son los parametros de canny. p
     contours_otsu, _ = cv2.findContours(thresh_otsu, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     return contours_otsu, imagen
 
+
+#-----------------------------------------------------------------------
+#-----------------------------------------------------------------------
+
+
 """IDENTIFICA DADOS Y MONEDAS"""
-# Crear carpetas para guardar imágenes
-os.makedirs("monedas", exist_ok=True)
-os.makedirs("dados", exist_ok=True)
+def clasificar_tipo_objeto(img):
+    contornos, imagen_procesada = procesar_imagen(img, 80, 180, 7)
 
-# Cargar y procesar la imagen
-img = cv2.imread('monedas.jpg')
-contornos, imagen_procesada = procesar_imagen(img, 80, 180, 7)
+    # Variables para conteo y almacenamiento de información
+    conteo_monedas = 0
+    conteo_dados = 0
+    total_dados = 0
+    areas_monedas = []
+    coordenadas_monedas = []
 
-# Variables para conteo
-conteo_monedas = 0
-conteo_dados = 0
+    for i, contour in enumerate(contornos):
+        area = cv2.contourArea(contour)
+        perimetro = cv2.arcLength(contour, True)
 
-# Procesar cada contorno detectado
-for i, contour in enumerate(contornos):
-    # Calcular área y perímetro
-    area = cv2.contourArea(contour)
-    perimetro = cv2.arcLength(contour, True)
-    
-    # Ignorar objetos pequeños (ruido)
-    if area < 500:
-        continue
-    
-    # Calcular el factor de forma
-    factor_forma = (4 * np.pi * area) / (perimetro ** 2) if perimetro > 0 else 0
-    
-    # Obtener bounding box y recortar ROI
-    x, y, w, h = cv2.boundingRect(contour)
-    roi = img[y:y+h, x:x+w]
-    
-    # Identificar si es moneda o dado usando el factor de forma
-    if factor_forma > 0.8:  # Umbral para formas redondeadas
-        tipo = "MONEDA"
-        conteo_monedas += 1
-        carpeta = "monedas"
-    else:
-        tipo = "DADO"
-        conteo_dados += 1
-        carpeta = "dados"
-    
-    # Guardar la imagen recortada en la carpeta correspondiente
-    ruta_archivo = os.path.join(carpeta, f"{tipo}_{i}.jpg")
-    cv2.imwrite(ruta_archivo, roi)
-    print(f"Guardado: {ruta_archivo}, Área={area}, Factor de Forma={factor_forma:.2f}")
-    
-    # Dibujar el contorno y mostrar clasificación en la imagen original
-    color = (0, 255, 0) if tipo == "MONEDA" else (255, 0, 0)
-    cv2.rectangle(img, (x, y), (x+w, y+h), color, 2)
-    cv2.putText(img, tipo, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+        # Ignorar objetos pequeños (ruido)
+        if area < 500:
+            continue
 
-# Mostrar resultados
-imshow(img, title="Clasificación de objetos")
-print(f"Total monedas: {conteo_monedas}")
-print(f"Total dados: {conteo_dados}")
+        # Calcular el factor de forma
+        factor_forma = (4 * np.pi * area) / (perimetro ** 2) if perimetro > 0 else 0
 
+        # Obtener bounding box y recortar ROI
+        x, y, w, h = cv2.boundingRect(contour)
+        roi = img[y:y+h, x:x+w]
+
+        # Clasificar como dado o moneda
+        if factor_forma < 0.8 and area < 85000.0:
+            tipo = "dado"
+            conteo_dados += 1
+            carpeta = "dados"
+            color = (255, 0, 0)  # Azul
+
+        else:
+            tipo = "moneda"
+            conteo_monedas += 1
+            carpeta = "monedas"
+            areas_monedas.append(area)
+            coordenadas_monedas.append((x, y, w, h))
+            color = (0, 255, 0)  # Verde
+
+        # Guardar la imagen recortada en la carpeta correspondiente
+        ruta_archivo = os.path.join(carpeta, f"{tipo}_{i}.jpg")
+        cv2.imwrite(ruta_archivo, roi)
+        print(f"Guardado: {ruta_archivo}")
+
+        # Dibujar el rectángulo y el texto en la imagen original
+        cv2.rectangle(img, (x, y), (x + w, y + h), color, 2)
+        cv2.putText(img, tipo, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+    
+    imshow(img)
+    return conteo_monedas, conteo_dados, total_dados, areas_monedas, coordenadas_monedas
 
 
 #-----------------------------------------------------------------------
 #-----------------------------------------------------------------------
 
 
-
-"""CODIGO OPTMIZADO PERO SE LE TIENE QUE PASAR LOS PARAMETROS DE CANNY (no esta tan bueno eso porque no estaría automatizado)"""
-def procesar_imagen_dado(ruta_imagen, umbral_canny_1, umbral_canny_2):
-    # Cargar la imagen
-    img_dado = cv2.imread(ruta_imagen)
-    imagen = cv2.cvtColor(img_dado, cv2.COLOR_BGR2GRAY)
-    
-    # Mostrar imagen original
-    #imshow(imagen, title="Imagen Original")
-
-    # Aplicar desenfoque gaussiano para reducir ruido
-    img_desenfoque = cv2.GaussianBlur(imagen, (5, 5), 0)
-    #imshow(img_desenfoque, title="Imagen Desenfocada")
-
-    # Detectar bordes con Canny
-    img_bordes = cv2.Canny(img_desenfoque, umbral_canny_1, umbral_canny_2)
-    #imshow(img_bordes, title="Bordes Detectados con Canny")
-
-    # Realizar operaciones morfológicas para limpiar bordes
-    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
-    img_dilatada = cv2.dilate(img_bordes, k, iterations=7)
-    #imshow(img_dilatada, title="Imagen Dilatada")
-
-    img_limpia = cv2.erode(img_dilatada, k, iterations=3)
-    #imshow(img_limpia, title="Imagen Limpiada")
-
-    # Umbralización y detección de contornos
-    _, thresh_otsu = cv2.threshold(img_limpia, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    contours_otsu, _ = cv2.findContours(thresh_otsu, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+"""IDENTIFICA EL TIPO DE DADO""" #hay que pasarle los parametros de canny
+def procesar_imagen_dado(imagen_dado, umbral_canny_1, umbral_canny_2):
+    contornos, imagen_procesada = procesar_imagen(imagen_dado, umbral_canny_1, umbral_canny_2, 2)
 
     # Dibuja todos los contornos sobre la imagen original
-    img_contornos = imagen.copy()
-    cv2.drawContours(img_contornos, contours_otsu, -1, (0, 255, 0), 2)
-    #imshow(img_contornos, title="Contornos Dibujados")
+    img_contornos = imagen_dado.copy()
+    cv2.drawContours(img_contornos, contornos, -1, (0, 255, 0), 2)
+    imshow(img_contornos, title="Contornos Dibujados")
 
     # Contar el número de contornos
-    print(f"Total de contornos detectados: {len(contours_otsu)}")
+    #print(f"Total de contornos detectados: {len(contornos)}")
 
     # Variables para conteo
     nro_dado = 0
 
     # Procesar cada contorno detectado
-    for i, contour in enumerate(contours_otsu):
+    for i, contour in enumerate(contornos):
         # Calcular área y perímetro
         area = cv2.contourArea(contour)
         perimetro = cv2.arcLength(contour, True)
@@ -166,153 +146,81 @@ def procesar_imagen_dado(ruta_imagen, umbral_canny_1, umbral_canny_2):
     print(f"Número del dado detectado: {nro_dado}")
     return nro_dado
 
-# Llamada a la función para procesar la imagen del dado 10
-nro_dado1 = procesar_imagen_dado('dados/DADO_10.jpg', umbral_canny_1=100, umbral_canny_2=452)
-
-# Llamada a la función para procesar la imagen del dado 18
-nro_dado2 = procesar_imagen_dado('dados/DADO_18.jpg', umbral_canny_1=280, umbral_canny_2=460)
-
-total = nro_dado1 + nro_dado2
-print("Total de los dados: ", total)
-
 
 #-----------------------------------------------------------------------
 #-----------------------------------------------------------------------
 
 
 """IDENTIFICA EL TIPO DE MONEDA"""
-""" OJO QUE ESTA LO DE VICKY, ACOMODAR!!!! """
+def detectar_tipo_monedas(img, areas_monedas, coordenadas_monedas):
+    if areas_monedas:
+        areas_monedas = np.array(areas_monedas).reshape(-1, 1)
+        kmeans = KMeans(n_clusters=3, random_state=0)  # Ajusta n_clusters según sea necesario
+        labels = kmeans.fit_predict(areas_monedas)
 
+        # Crear una nueva imagen para mostrar los clusters
+        img_clusters = img.copy()
+        total_dinero = 0
+
+        for idx, (x, y, w, h) in enumerate(coordenadas_monedas):
+            label = labels[idx]
+            if label == 0:
+                color = (0, 255, 0)  # Verde (1 peso)
+                valor = 1.0
+            elif label == 1:
+                color = (0, 0, 255)  # Rojo (10 centavos)
+                valor = 0.10
+            else:
+                color = (255, 255, 0)  # Azul (50 centavos)
+                valor = 0.50
+
+            total_dinero += valor
+            # Dibujar el rectángulo y el texto en la imagen
+            cv2.rectangle(img_clusters, (x, y), (x + w, y + h), color, 2)
+            cv2.putText(img_clusters, f"Cluster {label}, Valor: {valor:.2f} pesos", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+
+        # Devolver la imagen y el total de dinero
+        return img_clusters, total_dinero
+
+
+#-----------------------------------------------------------------------
+#-----------------------------------------------------------------------
+
+
+"""PROGRAMA PRINCIPAL"""
 # Crear carpetas para guardar imágenes
 os.makedirs("monedas", exist_ok=True)
 os.makedirs("dados", exist_ok=True)
 
-# Cargar la imagen
+# Cargar imagen
 img = cv2.imread('monedas.jpg')
-img_gris = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-# Aplicar desenfoque gaussiano para reducir ruido
-img_desenfoque = cv2.GaussianBlur(img_gris, (5, 5), 0)
+# Clasificar y guardar los objetos
+conteo_monedas, conteo_dados, total_dados, areas_monedas, coordenadas_monedas = clasificar_tipo_objeto(img)
+print("Cantidad de monedas: ", conteo_monedas)
+print("Cantidad de dados: ", conteo_dados)
 
-# Detectar bordes con Canny
-img_bordes = cv2.Canny(img_desenfoque, 80, 180)
+# Detectar nro del dado 1
+img_dado1 = cv2.imread('dados/DADO_10.jpg')
+nro_dado1 = procesar_imagen_dado(img_dado1, umbral_canny_1=100, umbral_canny_2=452)
 
-# Realizar operaciones morfológicas para limpiar bordes
-k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
-img_dilatada = cv2.dilate(img_bordes, k, iterations=7)
-img_limpia = cv2.erode(img_dilatada, k, iterations=3)
+# Detectar nro del dado 2
+img_dado2 = cv2.imread('dados/DADO_18.jpg')
+nro_dado2 = procesar_imagen_dado(img_dado2, umbral_canny_1=280, umbral_canny_2=460)
 
-# Umbralización y detección de contornos
-_, thresh_otsu = cv2.threshold(img_limpia, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-contours_otsu, _ = cv2.findContours(thresh_otsu, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+total = nro_dado1 + nro_dado2
+print("Total de los dados: ", total)
 
-# Variables para conteo
-conteo_monedas = 0
-conteo_dados = 0
-total_dados = 0
+# Detectar el tipo de monedas y devolver la imagen final
+img_resultado, total_dinero = detectar_tipo_monedas(img, areas_monedas, coordenadas_monedas)
+print(f"Total de dinero: {total_dinero} pesos")
 
-# Variables para almacenar áreas y coordenadas de monedas
-areas_monedas = []
-coordenadas_monedas = []
+# Mostrar la imagen final
+plt.imshow(cv2.cvtColor(img_resultado, cv2.COLOR_BGR2RGB))
+plt.title("Clasificación Final")
+plt.axis("off")
+plt.show()
 
-# Procesar cada contorno detectado y clasificar como dado o moneda
-for i, contour in enumerate(contours_otsu):
-    area = cv2.contourArea(contour)
-    perimetro = cv2.arcLength(contour, True)
-    
-    # Ignorar objetos pequeños (ruido)
-    if area < 500:
-        continue
-    
-    # Calcular el factor de forma
-    factor_forma = (4 * np.pi * area) / (perimetro ** 2) if perimetro > 0 else 0
-    
-    # Obtener bounding box y recortar ROI
-    x, y, w, h = cv2.boundingRect(contour)
-    roi = img[y:y+h, x:x+w]
-    
-    # Clasificar si es dado o moneda
-    if factor_forma < 0.8 and area < 85000.0:  
-        tipo = "dado"
-        conteo_dados += 1
-        carpeta = "dados"
-        
-        # Detectar círculos dentro del dado (caras del dado)
-        gris_dado = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-        gris_dado = cv2.GaussianBlur(gris_dado, (9, 9), 2)
-        círculos = cv2.HoughCircles(gris_dado, cv2.HOUGH_GRADIENT, dp=1, minDist=20, param1=50, param2=30, minRadius=10, maxRadius=40)
-        
-        # Filtrar y contar círculos detectados
-        if círculos is not None:
-            círculos = np.uint16(np.around(círculos))
-            num_círculos = len(círculos[0])
-            print(f"Dado {i} - Número dado: {num_círculos}")
-            cv2.putText(img, str(num_círculos), (x + w // 2, y + h // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        
-
-            # Sumar el número de puntos detectados (valor del dado)
-            total_dados += num_círculos
-
-    else:
-        tipo = "moneda"
-        conteo_monedas += 1
-        carpeta = "monedas"
-        areas_monedas.append(area)  # Solo guardar áreas de las monedas
-        coordenadas_monedas.append((x, y, w, h))  # Guardar coordenadas de las monedas
-    
-    # Guardar la imagen recortada en la carpeta correspondiente
-    ruta_archivo = os.path.join(carpeta, f"{tipo}_{i}.jpg")
-    cv2.imwrite(ruta_archivo, roi)
-    print(f"Guardado: {ruta_archivo}, Área={area}, Factor de Forma={factor_forma:.2f}")
-    
-    # Dibujar el contorno y mostrar clasificación en la imagen original
-    color = (0, 255, 0) if tipo == "moneda" else (255, 0, 0)
-    cv2.rectangle(img, (x, y), (x+w, y+h), color, 2)
-    cv2.putText(img, tipo, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-
-# Aplicar KMeans para clasificar las monedas en 3 grupos según el área
-if areas_monedas:
-    areas_monedas = np.array(areas_monedas).reshape(-1, 1)
-    kmeans = KMeans(n_clusters=3, random_state=0)  # Ajusta n_clusters según sea necesario
-    labels = kmeans.fit_predict(areas_monedas)
-
-    # Crear una nueva imagen para mostrar los clusters
-    img_clusters = img.copy()  # Hacer una copia para no sobreescribir la imagen original
-    
-    # Dibujar los clústeres en la imagen de los clusters
-    total_dinero = 0  # Variable para almacenar el total de dinero
-    for idx, (x, y, w, h) in enumerate(coordenadas_monedas):
-        label = labels[idx]  # Asignar el cluster al que pertenece la moneda
-        if label == 0:
-            color = (0, 255, 0)  # Verde para el primer cluster (1 peso)
-            valor = 1  # 1 peso
-        elif label == 1:
-            color = (0, 0, 255)  # Rojo para el segundo cluster (10 centavos)
-            valor = 0.10 # 10 centavos
-        else:
-            color = (255, 255, 0)  # Azul para el tercer cluster (50 centavos)
-            valor = 0.50  # 50 centavos
-        
-        # Imprimir el cluster al que pertenece la moneda
-        print(f"Moneda {idx + 1} - Cluster {label} - Valor: {valor} pesos")
-        
-        # Sumar el valor de la moneda al total
-        total_dinero += valor
-
-        # Dibujar el rectángulo y el texto en la imagen de los clusters
-        cv2.rectangle(img_clusters, (x, y), (x+w, y+h), color, 2)
-        cv2.putText(img_clusters, f"Cluster {label}", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-
-    # Mostrar la imagen con los clusters
-    imshow(img_clusters, title="Clusters de las Monedas")
-
-    # Imprimir el total de dinero calculado
-    print(f"Total de dinero: {total_dinero} pesos")
-
-# Mostrar resultados en la imagen original
-imshow(img, title="Clasificación de objetos")
 print(f"Total monedas: {conteo_monedas}")
 print(f"Total dados: {conteo_dados}")
-print(f"suma dados: {total_dados}")
-# Mantener abiertas las ventanas hasta que el usuario las cierre
-plt.show(block=True)
+print(f"Suma dados: {total_dados}")
