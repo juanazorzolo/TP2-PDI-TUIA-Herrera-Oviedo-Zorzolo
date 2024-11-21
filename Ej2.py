@@ -1,7 +1,11 @@
 """ ------------------ EJERCICIO 2 ----------------------- """
 import cv2
 import numpy as np
-from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
+import os
+from matplotlib.patches import Rectangle
+from PIL import Image, ImageDraw, ImageFont
+from sklearn.cluster import KMeans
 
 # Defininimos función para mostrar imágenes
 def imshow(img, new_fig=True, title=None, color_img=False, blocking=False, colorbar=True, ticks=False):
@@ -27,34 +31,40 @@ output_folder = "placas_detectadas"
 os.makedirs(output_folder, exist_ok=True)
 
 # Cargar la imagen
-img = cv2.imread('patentes/img01.png')
+img = cv2.imread('patentes/img12.png')
 
 # Mostrar imagen original
-imshow(img, title="Imagen Original", color_img=True)
+#imshow(img, title="Imagen Original", color_img=True)
 
 # Convertir a escala de grises
 img_gris = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-imshow(img_gris, title="Escala de Grises")
+#imshow(img_gris, title="Escala de Grises")
 
 # Reducir ruido con un desenfoque Gaussiano
 img_desenfoque = cv2.GaussianBlur(img_gris, (5, 5), 0)
-imshow(img_desenfoque, title="Desenfoque Gaussiano")
+#imshow(img_desenfoque, title="Desenfoque Gaussiano")
 
 # Detectar bordes con Canny
-bordes = cv2.Canny(img_desenfoque, 100, 200)
+bordes = cv2.Canny(img_desenfoque, 80, 160)
 imshow(bordes, title="Bordes Detectados")
 
+"""VER COMPONENTES CONECTADAS PARA LAS LETRAS"""
+
 # Aplicar operaciones morfológicas para resaltar formas rectangulares
-kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
 morph = cv2.morphologyEx(bordes, cv2.MORPH_CLOSE, kernel, iterations=2)
 imshow(morph, title="Morfología Aplicada")
 
 # Encontrar contornos
 contornos, _ = cv2.findContours(morph, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
+img_contornos = img.copy()
+cv2.drawContours(img_contornos, contornos, -1, (0, 255, 0), 2)
+imshow(img_contornos, title="Contornos Dibujados")
+
 # Filtrar contornos para identificar la placa
-RELACION_ASPECTO_ESPERADA = 2.28
-TOLERANCIA_ASPECTO = 0.3  # Tolerancia del 30% alrededor de la relación esperada
+relacion_aspecto_esperada = 2.28
+tolerancia_aspecto = 0.7  # Tolerancia del 30% alrededor de la relación esperada
 patente_detectada = False  # Bandera para verificar si se detectó alguna placa
 
 for idx, contorno in enumerate(contornos):
@@ -74,8 +84,8 @@ for idx, contorno in enumerate(contornos):
         # Calcular relación de aspecto
         relacion_aspecto = w / h
         
-        # Validar la relación de aspecto y el área
-        if (RELACION_ASPECTO_ESPERADA - TOLERANCIA_ASPECTO <= relacion_aspecto <= RELACION_ASPECTO_ESPERADA + TOLERANCIA_ASPECTO) and area > 5000:
+        # Validar la relación de aspecto y el área. 1.58 < 1.89 < 2.98
+        if (relacion_aspecto_esperada - tolerancia_aspecto <= relacion_aspecto <= relacion_aspecto_esperada + tolerancia_aspecto) and area < 5000:
             # Dibujar el contorno en la imagen original
             cv2.drawContours(img, [aproximado], -1, (0, 255, 0), 3)
             imshow(img, title=f"Placa Detectada #{idx+1}", color_img=True)
