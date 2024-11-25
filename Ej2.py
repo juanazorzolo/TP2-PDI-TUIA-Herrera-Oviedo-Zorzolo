@@ -245,7 +245,7 @@ def pegar_y_guardar_patente(nombre_imagen="patente"):
     cv2.imwrite(ruta_guardado, imagen_final)
     print(f"Imagen final guardada en {ruta_guardado}")
 
-# Encontrar patente completa en base a los carcateres detectados
+# Encontrar patente completa en base a los caracteres detectados
 def encontrar_rectangulo_patente(bounding_boxes):
     if not bounding_boxes:
         return None
