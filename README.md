@@ -36,14 +36,6 @@ pip install opencv-python numpy matplotlib pillow scikit-learn
 
 **Ejecución**:  
 Ejecuta el archivo "Ej2.py". Los resultados se mostrarán en las imágenes procesadas y en la terminal.
-   ```bash
-   Ej2.py
-   ```
-
-## Archivos Generados
-
-- Imágenes recortadas de monedas y dados en las carpetas `monedas` y `dados`.  
-- Imagen final procesada con la clasificación visual de los objetos.
 
 
 ## Funciones principales
@@ -87,7 +79,9 @@ El script muestra los resultados de cada etapa de procesamiento:
 - **Total de Dinero**: 7.40 pesos  
 
 
+---
 
+---
 
 # Detección y Segmentación de Caracteres en Patentes
 
@@ -110,7 +104,6 @@ pip install opencv-python numpy matplotlib pillow
 ```
 
 
----
 
 
 ## Estructura del Proyecto
@@ -160,8 +153,6 @@ El proyecto utiliza las siguientes carpetas:
    Ej2.py
    ```
 
-   
----
 
 ## Resultados
 
@@ -174,11 +165,6 @@ El proyecto utiliza las siguientes carpetas:
 
 - El código incluye filtros para optimizar la detección según el área y la relación de aspecto de los caracteres.
 - Se pueden ajustar los parámetros como `area_min`, `area_max` o los rangos de thresholds en la función `ajustar_canny` para mejorar los resultados según las imágenes.
-
-## Ejemplo
-
-Una vez procesadas las imágenes, las letras detectadas y segmentadas se organizan en un formato legible, permitiendo analizar o exportar los caracteres de las patentes.
-
 
 
 
